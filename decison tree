@@ -1,0 +1,44 @@
+import pandas as pd 
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report,accuracy_score,confusion_matrix
+from sklearn.model_selection import train_test_split as tts
+from sklearn.tree import DecisionTreeClassifier,plot_tree
+
+df=pd.read_csv("Admission_Predict.csv")
+
+df = df.drop(columns=["Serial No."])
+th = df['Chance of Admit '].quantile(0.75)
+df['Admitted'] = (df['Chance of Admit '] >= th).astype(int)
+X, y = df.drop(columns=['Chance of Admit ', 'Admitted']), df['Admitted']
+
+
+X_train, X_test, y_train, y_test = tts(X, y, test_size=0.2, random_state=42, stratify=y)
+
+
+model= DecisionTreeClassifier(criterion='gini', random_state=42, max_depth=5)
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+print("Classification Report:\n", classification_report(y_test, y_pred))
+
+
+plt.figure(figsize=(10, 6))
+plot_tree(model, feature_names=X.columns, class_names=["Not Admitted", "Admitted"], filled=True)
+plt.title("Decision Tree (Gini Index)")
+plt.show()
+
+model= DecisionTreeClassifier(criterion='entropy', random_state=42, max_depth=5)
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+print("Classification Report:\n", classification_report(y_test, y_pred))
+
+
+plt.figure(figsize=(10, 6))
+plot_tree(model, feature_names=X.columns, class_names=["Not Admitted", "Admitted"], filled=True)
+plt.title("Decision Tree (Entropy )")
+plt.show()
