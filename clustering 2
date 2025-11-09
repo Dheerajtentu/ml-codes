@@ -1,0 +1,155 @@
+import pandas as pd 
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split as tts , KFold
+
+from sklearn.cluster import KMeans , AgglomerativeClustering 
+from sklearn.metrics import silhouette_score
+from scipy.cluster.hierarchy import dendrogram , linkage 
+import warnings
+warnings.filterwarnings('ignore')
+
+df = pd.read_csv("Mall_Customers.csv")
+df.head()
+
+x = df.loc[: ,'Annual Income (k$)':'Spending Score (1-100)']
+x
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(x)
+X_scaled.size
+
+# scatter 
+import matplotlib.pyplot as plt
+plt.figure(figsize = (12 , 8))
+plt.scatter(x['Annual Income (k$)'] , x['Spending Score (1-100)'])
+plt.title('Unclustered Data(Annual Income vs Spending Score)' )
+plt.xlabel('Annual Income' )
+plt.ylabel('Spending Score')
+plt.grid(True)
+plt.show()
+
+x_train , x_test = tts(X_scaled , test_size = 0.2 , random_state = 20)
+
+# k means 
+wcss = []
+sil = []
+k_range = range(2 , min(11 , len(x_train)))
+
+for k in k_range:
+    kmeans = KMeans(n_clusters=k)
+    labels = kmeans.fit_predict(x_train)
+
+    wcss.append(kmeans.inertia_)
+
+    sil_s = silhouette_score(x_train , labels)
+    sil.append(sil_s)
+
+wcssd = np.diff(wcss)
+wcssd1 = np.diff(wcssd)
+elbow_k = np.argmin(wcssd1) + 1
+best_sil = np.argmax(sil) + 2 
+
+optimal_k = best_sil if best_sil < elbow_k else elbow_k
+
+# a = [a , b , c , d, e]
+# a = [b -a , b - c , c - d , d -e]
+# a = []
+
+# sil -> range(2 , len(sil) + 2) 
+
+
+
+plt.figure(figsize=(20, 7))  
+plt.subplot(1, 2, 1)  
+plt.plot(k_range, wcss)  
+plt.subplot(1, 2, 2)  
+plt.plot(range(2 , len(sil) + 2), sil)  
+plt.show()  
+
+
+print(f"Optimal number of clusters (Silhouette method): {best_sil}")
+print(f"Optimal number of clusters (Elbow method): {elbow_k}")
+print(f"Optimal Value of k: {optimal_k}")
+
+kmeans = KMeans(n_clusters=optimal_k)
+kmeans.fit(x_train)
+train_label = kmeans.predict(x_train)
+test_label = kmeans.predict(x_test)
+centroid = kmeans.cluster_centers_
+
+pairs = []
+k = len(centroid)
+for i in range(k):
+    for j in range(i+1, k):
+        d = np.linalg.norm(centroid[i] - centroid[j])
+        pairs.append((i, j, d))
+for p in pairs:
+    print(f"Distance between cluster {p[0]} and {p[1]} = {p[2]}")
+
+def total_wcss(x, labels, centroid):
+    wcss = 0.0
+    for i in range(len(centroid)):
+        cluster_points = x[labels == i]
+        wcss += np.sum((cluster_points - centroid[i])**2)
+    return wcss
+
+# usage
+WCSS = total_wcss(x_train, train_labels, centroid)
+print("Total WCSS:", WCSS)
+
+
+# from sklearn.metrics.pairwise import euclidean_distances
+# dist_matrix = euclidean_distances(centroid, centroid)
+# print(dist_matrix)
+
+
+plt.figure(figsize=(14, 7))  
+
+for i in range(optimal_k):
+    plt.scatter(x_train[train_label == i, 0] , x_train[train_label == i, 1] , color = 'red' , label = 'train')
+    plt.scatter(x_test[test_label == i, 0], x_test[test_label == i, 1] , color = 'yellow' , marker = '*' , label = 'test')
+    plt.scatter(centroid[i, 0], centroid[i, 1], s=100, color = 'blue' , marker = '+' , label = 'centroid')   
+plt.legend()
+plt.grid(True)  
+plt.show()  
+
+def perform_k_fold(data , n_splits = 5 , k = 5):
+    kf = KFold(n_splits=n_splits)
+    fold_scores = [] # sil score 
+    fold_count = 1
+    for train_index , test_index in kf.split(data):
+        train_data , test_data = data[train_index] , data[test_index]
+        kmeans = KMeans(n_clusters = k)
+        kmeans.fit(train_data)
+
+        test_labels = kmeans.predict(test_data)
+        score = silhouette_score(test_data , test_labels)
+        fold_scores.append(score)
+        fold_count = fold_count + 1 
+
+    avg_fold = sum(fold_scores)/fold_count
+    print(avg_fold)
+    return avg_fold
+
+k_mean_valiodation = perform_k_fold(x_train , n_splits = 5  , k = optimal_k)
+
+best_k = 3
+alg = AgglomerativeClustering(n_clusters=best_k , linkage='ward')
+train_labels = alg.fit_predict(x_train)
+
+plt.figure(figsize=(12, 8))
+
+linkage_matrix = linkage(x_train, method='ward')
+dendrogram(linkage_matrix)
+plt.show()
+
+plt.figure(figsize=(14, 7))  
+
+for i in range(best_k):
+    plt.scatter(x_train[train_labels == i, 0] , x_train[train_labels == i, 1] , color = 'red' , label = 'train')
+    plt.scatter(x_test[test_label == i, 0], x_test[test_label == i, 1] , color = 'yellow' , marker = '*' , label = 'test')
+    plt.scatter(centroid[i, 0], centroid[i, 1], s=100, color = 'blue' , marker = '+' , label = 'centroid')   
+plt.legend()
+plt.grid(True)  
+plt.show()  
