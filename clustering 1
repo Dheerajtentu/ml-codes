@@ -1,0 +1,89 @@
+import os, glob
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.metrics import silhouette_score, davies_bouldin_score
+from sklearn.model_selection import train_test_split
+
+df = pd.read_csv('Mall_Customers.csv')
+df.head()
+
+# ---------- select features (Annual Income and Spending Score) ----------
+X = df[['Annual Income (k$)', 'Spending Score (1-100)']]
+X.describe()
+
+# ---------- Silhouette scores for k=2..15 ----------
+sil = []
+K_sil = list(range(2,16))
+for k in K_sil:
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    labels = km.fit_predict(X)
+    sil.append(silhouette_score(X, labels))
+
+plt.figure(figsize=(8,4))
+sns.lineplot(x=K_sil, y=sil)
+plt.xlabel('k (number of clusters)')
+plt.ylabel('Silhouette Score')
+plt.title('Silhouette Scores')
+plt.show()
+
+# choose number of clusters (example: best silhouette)
+best_k = K_sil[int(np.argmax(sil))]
+print("Best k by silhouette:", best_k)
+
+# ---------- Train/test split (for assignment completeness) ----------
+X_train, X_test = train_test_split(X, test_size=0.3, random_state=42)
+
+
+# Fit KMeans on train, predict on test
+km_final = KMeans(n_clusters=best_k, random_state=42, n_init=10)
+km_final.fit(X_train)
+train_labels = km_final.labels_
+test_labels = km_final.predict(X_test)
+
+# Evaluate clustering (silhouette and DB) on entire dataset using fitted model
+labels_full = km_final.predict(X)  # assign to full dataset
+sil_full = silhouette_score(X, labels_full)
+db_full = davies_bouldin_score(X, labels_full)
+print(f"KMeans (k={best_k}) silhouette: {sil_full:.4f}, Davies-Bouldin: {db_full:.4f}")
+
+# scatter plot clusters for KMeans
+centers = km_final.cluster_centers_
+plt.figure(figsize=(7,5))
+sns.scatterplot(x=X['Annual Income (k$)'], y=X['Spending Score (1-100)'], hue=labels_full, palette='tab10', legend='full')
+plt.scatter(centers[:,0], centers[:,1], s=200, c='red', marker='X', label='centroids')
+plt.title(f'KMeans clusters (k={best_k})')
+plt.xlabel('Annual Income (k$)')
+plt.ylabel('Spending Score (1-100)')
+plt.legend()
+plt.show()
+
+# ---------- Agglomerative Clustering ----------
+agg = AgglomerativeClustering(n_clusters=best_k)
+agg_labels = agg.fit_predict(X)
+
+sil_agg = silhouette_score(X, agg_labels)
+db_agg = davies_bouldin_score(X, agg_labels)
+print(f"Agglomerative (k={best_k}) silhouette: {sil_agg:.4f}, Davies-Bouldin: {db_agg:.4f}")
+
+plt.figure(figsize=(7,5))
+sns.scatterplot(x=X['Annual Income (k$)'], y=X['Spending Score (1-100)'], hue=agg_labels, palette='tab10', legend='full')
+plt.title(f'Agglomerative clusters (k={best_k})')
+plt.xlabel('Annual Income (k$)')
+plt.ylabel('Spending Score (1-100)')
+plt.show()
+
+# ---------- Cross-validation for clustering (stability via random subsampling) ----------
+# simple repeated subsampling: compute silhouette on several random subsets
+n_repeats = 10
+sil_scores_kmeans = []
+for i in range(n_repeats):
+    subset = X.sample(frac=0.8, random_state=42+i)  # 80% sample
+    labels_sub = km_final.predict(subset)
+    sil_scores_kmeans.append(silhouette_score(subset, labels_sub))
+
+print("KMeans silhouette on 80% random subsamples:", np.round(sil_scores_kmeans, 4))
+print("Mean silhouette (cv-like):", np.mean(sil_scores_kmeans).round(4))
