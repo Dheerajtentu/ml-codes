@@ -64,10 +64,12 @@ print(" MAE:", mae)
 print("R²", r2)
 
 plt.scatter(X,y,color = 'blue', label = 'Actual Data')
+plt.scatter(X_train,y_train,color = 'yellow', label = 'trained Data')
+plt.scatter(X_test,y_test,color = 'green', label = 'test Data')
+plt.scatter(X_test,y_pred,color="blue",label="Predicted")
 plt.plot(X,model.predict(X), color = 'red',label = 'Regression Line')
 plt.title("ANNUAL Temperature Prediction ")
 plt.xlabel("ANNUAL")
 plt.ylabel("Temperature (°C)")
 plt.legend()
 plt.show()
-
